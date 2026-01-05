@@ -1,0 +1,1365 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Malware Analysis Sandbox</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    .threat-card {
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    
+    .threat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .demo-banner {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0.75rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+    
+    .upload-zone {
+      border: 3px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 3rem;
+      text-align: center;
+      transition: all 0.3s ease;
+      background: white;
+    }
+    
+    .upload-zone:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    
+    .upload-zone.dragging {
+      border-color: #667eea;
+      background: #eef2ff;
+      transform: scale(1.02);
+    }
+    
+    .progress-bar {
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      transition: width 0.3s ease;
+      border-radius: 9999px;
+    }
+    
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    
+    .modal-content {
+      background: white;
+      border-radius: 16px;
+      max-width: 900px;
+      width: 100%;
+      max-height: 90%;
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+    }
+    
+    .scan-stage {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      background: #f9fafb;
+      border-left: 4px solid #e5e7eb;
+    }
+    
+    .scan-stage.active {
+      background: #eef2ff;
+      border-left-color: #667eea;
+    }
+    
+    .scan-stage.complete {
+      background: #f0fdf4;
+      border-left-color: #10b981;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .spinner {
+      animation: spin 1s linear infinite;
+    }
+    
+    .hidden {
+      display: none;
+    }
+
+    .pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: .5;
+      }
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <main class="h-full w-full overflow-auto" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+   <div class="demo-banner">
+    ⚠️ DEMONSTRATION ONLY - Simulated Analysis for Educational Purposes - No Actual Files Are Processed
+   </div>
+   <div style="min-height: calc(100% - 3rem); padding: 2rem;">
+    <div style="max-width: 1400px; margin: 0 auto;"><!-- Header -->
+     <header style="margin-bottom: 2rem;">
+      <h1 id="main-title" style="font-size: 2.5rem; font-weight: 700; color: white; margin-bottom: 0.5rem;">Malware Analysis Sandbox</h1>
+      <p id="subtitle" style="font-size: 1.125rem; color: rgba(255,255,255,0.9);">Upload any file for comprehensive threat analysis</p>
+     </header><!-- Upload Zone -->
+     <div id="upload-section" style="margin-bottom: 2rem;">
+      <div class="upload-zone" id="upload-zone">
+       <div style="font-size: 3rem; margin-bottom: 1rem;">
+        📁
+       </div>
+       <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">Drop files here or click to upload</h3>
+       <p style="color: #6b7280; margin-bottom: 1.5rem;">Supported formats: .exe, .dll, .pdf, .doc, .zip, and more</p><input type="file" id="file-input" style="display: none;" accept="*/*"> <button onclick="document.getElementById('file-input').click()" style="background: #667eea; color: white; padding: 0.75rem 2rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s;"> Select File </button>
+      </div>
+     </div><!-- Analysis Progress -->
+     <div id="analysis-section" class="hidden" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+       <div>
+        <h3 style="font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">Analyzing: <span id="file-name">sample.exe</span></h3>
+        <p style="color: #6b7280; font-size: 0.875rem;">File Size: <span id="file-size">2.4 MB</span></p>
+       </div><button onclick="cancelAnalysis()" style="padding: 0.5rem 1rem; border-radius: 8px; border: 2px solid #dc2626; color: #dc2626; background: white; font-weight: 600; cursor: pointer;"> Cancel </button>
+      </div>
+      <div id="scan-stages"><!-- Scan stages will be rendered here -->
+      </div>
+      <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb;">
+       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;"><span style="font-weight: 600; color: #1f2937;">Overall Progress</span> <span id="progress-percent" style="font-weight: 700; color: #667eea;">0%</span>
+       </div>
+       <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+       </div>
+      </div>
+     </div><!-- Analysis Result Card -->
+     <div id="result-section" class="hidden" style="margin-bottom: 2rem;">
+      <div style="background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+       <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div id="result-icon" style="font-size: 4rem; margin-bottom: 1rem;">
+         🔍
+        </div>
+        <h2 style="font-size: 1.75rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">Analysis Complete</h2>
+        <p style="color: #6b7280;">Threat detected and classified</p>
+       </div>
+       <div id="result-content"><!-- Result will be rendered here -->
+       </div>
+       <div style="display: flex; gap: 1rem; margin-top: 2rem;"><button onclick="showDetailedReportForResult()" style="flex: 1; background: #667eea; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer;"> View Full Report </button> <button onclick="resetUpload()" style="flex: 1; background: #f3f4f6; color: #374151; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer;"> Analyze Another File </button>
+       </div>
+      </div>
+     </div><!-- Threat Database Section -->
+     <div id="database-section">
+      <div style="background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+       <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem;">Threat Database</h3>
+       <p style="color: #6b7280; margin-bottom: 1rem;">Browse our comprehensive database of 50+ malware signatures</p>
+       <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;"><button onclick="filterBySeverity('all')" id="filter-all" style="padding: 0.5rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: #667eea; color: white;"> All (<span id="count-all">50</span>) </button> <button onclick="filterBySeverity('critical')" id="filter-critical" style="padding: 0.5rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;"> Critical (<span id="count-critical">12</span>) </button> <button onclick="filterBySeverity('high')" id="filter-high" style="padding: 0.5rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;"> High (<span id="count-high">15</span>) </button> <button onclick="filterBySeverity('medium')" id="filter-medium" style="padding: 0.5rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;"> Medium (<span id="count-medium">13</span>) </button> <button onclick="filterBySeverity('low')" id="filter-low" style="padding: 0.5rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; background: #f3f4f6; color: #374151;"> Low (<span id="count-low">10</span>) </button>
+       </div>
+      </div><!-- Threats List -->
+      <div id="threats-container" style="display: grid; gap: 1rem;"><!-- Threats will be rendered here -->
+      </div>
+     </div>
+    </div>
+   </div><!-- Detailed Report Modal -->
+   <div id="report-modal" class="modal-overlay hidden" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+     <div style="padding: 2rem; border-bottom: 1px solid #e5e7eb;">
+      <div style="display: flex; justify-content: space-between; align-items: start;">
+       <div>
+        <h2 id="modal-title" style="font-size: 1.75rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">Threat Details</h2>
+        <p id="modal-detected" style="color: #6b7280;">Detected: 2 min ago</p>
+       </div><button onclick="closeReportModal()" style="font-size: 1.5rem; color: #6b7280; background: none; border: none; cursor: pointer; padding: 0.5rem;">✕</button>
+      </div>
+     </div>
+     <div id="modal-body" style="padding: 2rem;"><!-- Modal content will be rendered here -->
+     </div>
+    </div>
+   </div>
+  </main>
+  <script>
+    const defaultConfig = {
+      main_title: "Malware Analysis Sandbox",
+      subtitle: "Upload any file for comprehensive threat analysis",
+      background_color: "#667eea",
+      card_color: "#ffffff",
+      text_color: "#1f2937",
+      critical_color: "#dc2626",
+      high_color: "#ea580c",
+      font_family: "system-ui",
+      font_size: 16
+    };
+
+    const sampleThreats = [
+      // CRITICAL THREATS - Modern Ransomware & APTs
+      { 
+        id: 1, 
+        name: "WannaCry", 
+        type: "Ransomware", 
+        severity: "critical", 
+        detected: "Historical - 2017",
+        keywords: ["wannacry", "wanna", "cry", "wcry"],
+        hash: "ed01ebfbc9eb5bbea545af4d01bf5f1071661840480439c6e5babe8e080e41aa",
+        behavior: ["EternalBlue exploit (SMB vulnerability)", "Self-propagating worm capabilities", "RSA+AES encryption", "Kills database processes", "Demands Bitcoin ransom"],
+        indicators: ["Creates @WanaDecryptor@.exe", "Drops ransom note in multiple languages", "Scans for SMB port 445", "Tor communication"],
+        mitigation: "Patch MS17-010 immediately, disable SMBv1, isolate infected systems, do not pay ransom"
+      },
+      { 
+        id: 2, 
+        name: "NotPetya (ExPetr)", 
+        type: "Ransomware", 
+        severity: "critical", 
+        detected: "Historical - 2017",
+        keywords: ["notpetya", "petya", "expetr"],
+        hash: "027cc450ef5f8c5f653329641ec1fed91f694e0d229928963b30f6b0d7d3a745",
+        behavior: ["Wiper disguised as ransomware", "EternalBlue + PSExec spreading", "Overwrites MBR", "Credential theft via Mimikatz", "Permanent data destruction"],
+        indicators: ["Modified MBR with ransom message", "Network-wide rapid spread", "No actual decryption possible", "Targets Ukrainian infrastructure"],
+        mitigation: "This is a wiper not ransomware - data recovery impossible. Focus on backups and system restoration"
+      },
+      { 
+        id: 3, 
+        name: "Ryuk", 
+        type: "Ransomware", 
+        severity: "critical", 
+        detected: "Historical - 2018-2021",
+        keywords: ["ryuk"],
+        hash: "23f8aa94ffb3c08a62735fe7fee5799880a8f322ce1d55ec49a13a3f85312db2",
+        behavior: ["Targeted attacks on enterprises", "Disables Windows System Restore", "Deletes shadow copies", "Encrypts network drives", "Multi-million dollar ransoms"],
+        indicators: ["Delivered via TrickBot/Emotet", "Manual network reconnaissance", "Exfiltration before encryption", "Custom encryption per victim"],
+        mitigation: "Engage incident response team, isolate all systems, restore from offline backups, report to FBI"
+      },
+      { 
+        id: 4, 
+        name: "LockBit 3.0", 
+        type: "Ransomware", 
+        severity: "critical", 
+        detected: "Modern - 2024",
+        keywords: ["lockbit", "lock", "bit"],
+        hash: "f9e8d7c6b5a4e3d2c1b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0",
+        behavior: ["Ransomware-as-a-Service (RaaS)", "Self-propagation", "StealBit exfiltration tool", "Bug bounty program", "Targets backups"],
+        indicators: ["Group policy abuse", "Disables Windows Defender", "Multi-language ransom notes", "Leak site threats"],
+        mitigation: "Network isolation, engage cyber insurance, assess data exfiltration, never pay ransom"
+      },
+      { 
+        id: 5, 
+        name: "BlackCat (ALPHV)", 
+        type: "Ransomware", 
+        severity: "critical", 
+        detected: "Modern - 2024",
+        keywords: ["blackcat", "alphv", "cat"],
+        hash: "c6b5a4f3e2d1c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0",
+        behavior: ["Written in Rust language", "Cross-platform (Windows/Linux/ESXi)", "Triple extortion tactics", "Customizable per affiliate", "API-based encryption"],
+        indicators: ["ChaCha20 encryption", "Targets VMware ESXi", "Credential dumping", "Custom obfuscation per deployment"],
+        mitigation: "Patch ESXi vulnerabilities, implement MFA, monitor for data exfiltration, restore from isolated backups"
+      },
+      { 
+        id: 6, 
+        name: "Stuxnet", 
+        type: "APT", 
+        severity: "critical", 
+        detected: "Historical - 2010",
+        keywords: ["stuxnet"],
+        hash: "ac21c4faf0c1b2e6e0f5f5c5d3f5e0b6c5d3e5f0b6c5d3e5f0b6c5d3",
+        behavior: ["First cyber weapon", "Targets SCADA systems", "Spreads via USB drives", "Four zero-day exploits", "Sabotages centrifuges"],
+        indicators: ["Digitally signed with stolen certificates", "PLC rootkit", "Windows rootkit", "Targets Siemens Step7"],
+        mitigation: "Air-gap critical infrastructure, update all systems, remove USB autorun, verify digital signatures"
+      },
+      { 
+        id: 7, 
+        name: "Pegasus", 
+        type: "Spyware", 
+        severity: "critical", 
+        detected: "Modern - NSO Group",
+        keywords: ["pegasus", "nso"],
+        hash: "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7",
+        behavior: ["Zero-click iPhone exploit", "Complete device takeover", "Activates camera/microphone", "Exfiltrates all data", "Self-destructs on detection"],
+        indicators: ["iMessage exploit chains", "Kernel privileges", "Jailbreak not required", "Extremely targeted deployment"],
+        mitigation: "Update iOS immediately, enable Lockdown Mode, use security audits, physical device inspection"
+      },
+      { 
+        id: 8, 
+        name: "Emotet", 
+        type: "Botnet", 
+        severity: "critical", 
+        detected: "Historical - 2014-2021",
+        keywords: ["emotet"],
+        hash: "5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0",
+        behavior: ["Polymorphic banking trojan", "Email spam botnet", "Delivers secondary payloads", "Credential harvesting", "Modular architecture"],
+        indicators: ["Malicious Office macros", "PowerShell obfuscation", "DLL injection", "C2 via HTTPS"],
+        mitigation: "Taken down in 2021 but resurged - Block macro documents, update email filters, isolate infections"
+      },
+      { 
+        id: 9, 
+        name: "Mirai", 
+        type: "Botnet", 
+        severity: "critical", 
+        detected: "Historical - 2016",
+        keywords: ["mirai"],
+        hash: "8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3",
+        behavior: ["IoT botnet", "DDoS attacks", "Brute force default credentials", "Largest DDoS in history", "Open source code"],
+        indicators: ["Scans for Telnet port 23", "Default password lists", "Targets IoT devices", "Self-propagation"],
+        mitigation: "Change default IoT passwords, disable Telnet, segment IoT networks, implement rate limiting"
+      },
+      { 
+        id: 10, 
+        name: "Zeus (Zbot)", 
+        type: "Trojan", 
+        severity: "critical", 
+        detected: "Historical - 2007-2014",
+        keywords: ["zeus", "zbot"],
+        hash: "7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2",
+        behavior: ["Banking credential theft", "Man-in-the-browser attacks", "Form grabbing", "Keylogging", "Botnet capabilities"],
+        indicators: ["Injects into browsers", "Hooks Windows APIs", "Config files encrypted", "P2P C2 variants"],
+        mitigation: "Use web security tools, monitor for unauthorized transactions, credential reset, antivirus scanning"
+      },
+      { 
+        id: 11, 
+        name: "Conficker (Downadup)", 
+        type: "Worm", 
+        severity: "critical", 
+        detected: "Historical - 2008",
+        keywords: ["conficker", "downadup"],
+        hash: "6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1",
+        behavior: ["Exploits MS08-067", "Self-propagating worm", "Creates botnet", "Blocks security sites", "USB spreading"],
+        indicators: ["Network scanning on SMB", "Disables Windows services", "Domain generation algorithm", "Creates hidden shares"],
+        mitigation: "Patch MS08-067, disable AutoRun, clean infected systems, block DGA domains"
+      },
+      { 
+        id: 12, 
+        name: "BlackLotus", 
+        type: "Rootkit", 
+        severity: "critical", 
+        detected: "Modern - 2023",
+        keywords: ["blacklotus", "lotus"],
+        hash: "d7c6b5a4f3e2d1c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1",
+        behavior: ["First UEFI bootkit to bypass Secure Boot", "Kernel-mode rootkit", "Persistent across OS reinstalls", "Disables security software", "Hardware-level infection"],
+        indicators: ["Modified UEFI firmware", "Boot manager anomalies", "Kernel driver signing bypass", "CVE-2022-21894 exploit"],
+        mitigation: "UEFI firmware update required, TPM reset, complete hardware remediation may be necessary"
+      },
+
+      // HIGH SEVERITY THREATS
+      { 
+        id: 13, 
+        name: "TrickBot", 
+        type: "Trojan", 
+        severity: "high", 
+        detected: "Historical - 2016-2022",
+        keywords: ["trickbot", "trick"],
+        hash: "9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4",
+        behavior: ["Banking trojan evolution", "Credential theft", "Network reconnaissance", "Delivers ransomware", "Modular plugins"],
+        indicators: ["Uses legitimate tools like Mimikatz", "Lateral movement via SMB", "Network mapping", "Cobalt Strike deployment"],
+        mitigation: "Remove all instances, scan for lateral movement, credential reset, block C2 infrastructure"
+      },
+      { 
+        id: 14, 
+        name: "Qakbot (Qbot)", 
+        type: "Trojan", 
+        severity: "high", 
+        detected: "Modern - 2024",
+        keywords: ["qakbot", "qbot"],
+        hash: "e8d7c6b5a4f3e2d1c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3",
+        behavior: ["Banking malware turned ransomware dropper", "Email hijacking", "Worm-like spreading", "Credential harvesting", "Proxy network"],
+        indicators: ["Excel macros with VBS", "DLL side-loading", "Process hollowing", "HTTPS C2 beaconing"],
+        mitigation: "Taken down by FBI in 2023 but variations persist - Block malicious emails, scan endpoints"
+      },
+      { 
+        id: 15, 
+        name: "DarkGate", 
+        type: "Backdoor", 
+        severity: "high", 
+        detected: "Modern - 2024",
+        keywords: ["darkgate", "dark", "gate"],
+        hash: "b5a4f3e2d1c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0",
+        behavior: ["Remote access trojan", "Cryptocurrency mining", "Information stealing", "Keylogging", "Process injection"],
+        indicators: ["AutoIt script-based", "Reverse shell connections", "Clipboard hijacking", "Anti-VM detection"],
+        mitigation: "Terminate malicious processes, remove persistence, scan for stolen credentials"
+      },
+      { 
+        id: 16, 
+        name: "RedLine Stealer", 
+        type: "Spyware", 
+        severity: "high", 
+        detected: "Modern - 2024",
+        keywords: ["redline", "stealer"],
+        hash: "a4f3e2d1c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9",
+        behavior: ["Steals browser credentials", "Cryptocurrency wallet theft", "VPN/FTP credentials", "Discord tokens", "System fingerprinting"],
+        indicators: ["Targets browser SQLite databases", "Memory scraping", "Uploads to Telegram bots", "Sold as MaaS"],
+        mitigation: "Change all passwords immediately, revoke tokens, move crypto assets, scan for data leakage"
+      },
+      { 
+        id: 17, 
+        name: "Raspberry Robin", 
+        type: "Worm", 
+        severity: "high", 
+        detected: "Modern - 2024",
+        keywords: ["raspberry", "robin"],
+        hash: "f3e2d1c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8",
+        behavior: ["USB worm", "Deploys ransomware payloads", "TOR C2 communication", "Fileless execution", "Anti-analysis techniques"],
+        indicators: ["Spreads via USB drives", "Windows Installer exploitation", "External C2 via TOR", "Evades EDR"],
+        mitigation: "Disable AutoRun, block TOR traffic, remove from USB devices, monitor for payload delivery"
+      },
+      { 
+        id: 18, 
+        name: "SmokeLoader", 
+        type: "Trojan", 
+        severity: "high", 
+        detected: "Modern - 2024",
+        keywords: ["smokeloader", "smoke", "loader"],
+        hash: "d1c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6",
+        behavior: ["Modular malware loader", "Downloads additional payloads", "Anti-VM detection", "Process injection", "Plugin architecture"],
+        indicators: ["Unpacks in memory", "HTTP C2 traffic", "Registry modifications", "Multiple payload downloads"],
+        mitigation: "Remove loader and all plugins, check for secondary infections, monitor network for downloads"
+      },
+      { 
+        id: 19, 
+        name: "Dridex", 
+        type: "Trojan", 
+        severity: "high", 
+        detected: "Historical - 2014-2020",
+        keywords: ["dridex"],
+        hash: "c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5",
+        behavior: ["Banking trojan", "Web injects", "Credential theft", "Macros in documents", "Botnet infrastructure"],
+        indicators: ["Malicious Office documents", "Registry persistence", "Web traffic interception", "P2P C2"],
+        mitigation: "Block macro documents, monitor banking sessions, credential reset, remove persistence"
+      },
+      { 
+        id: 20, 
+        name: "Agent Tesla", 
+        type: "Spyware", 
+        severity: "high", 
+        detected: "Modern - 2024",
+        keywords: ["agent", "tesla"],
+        hash: "b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4",
+        behavior: ["Keylogger", "Screen capture", "Clipboard theft", "Credential harvesting", "Webcam access"],
+        indicators: [".NET malware", "SMTP/FTP exfiltration", "Clipboard monitoring", "Form grabbing"],
+        mitigation: "Remove keylogger, scan for exfiltrated data, change all credentials, enable MFA"
+      },
+      { 
+        id: 21, 
+        name: "IcedID (BokBot)", 
+        type: "Trojan", 
+        severity: "high", 
+        detected: "Historical - 2017-2023",
+        keywords: ["icedid", "bokbot"],
+        hash: "a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3",
+        behavior: ["Banking trojan", "Web injection", "Ransomware dropper", "Network spreading", "Modular design"],
+        indicators: ["Gzip-compressed C2", "VNC for remote control", "Proxy traffic", "Fake update pages"],
+        mitigation: "Removed in 2023 but variants exist - Block C2, scan for ransomware payloads"
+      },
+      { 
+        id: 22, 
+        name: "Cobalt Strike Beacon", 
+        type: "Backdoor", 
+        severity: "high", 
+        detected: "Tool Abuse - Ongoing",
+        keywords: ["cobalt", "strike", "beacon"],
+        hash: "c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5",
+        behavior: ["Legitimate pentesting tool abused", "Command and control", "Post-exploitation", "Lateral movement", "Privilege escalation"],
+        indicators: ["Named pipes communication", "Beacon activity patterns", "Process injection", "Kerberos manipulation"],
+        mitigation: "Hunt for unauthorized beacons, block C2 infrastructure, investigate attacker objectives"
+      },
+      { 
+        id: 23, 
+        name: "AsyncRAT", 
+        type: "Trojan", 
+        severity: "high", 
+        detected: "Modern - 2024",
+        keywords: ["asyncrat", "async", "rat"],
+        hash: "d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0",
+        behavior: ["Remote administration trojan", "Open-source RAT", "Keylogging", "Clipboard theft", "Anti-analysis"],
+        indicators: [".NET executable", "Task Scheduler persistence", "Encrypted C2", "Process injection"],
+        mitigation: "Remove scheduled tasks, terminate processes, block C2 domains"
+      },
+      { 
+        id: 24, 
+        name: "Gh0st RAT", 
+        type: "Backdoor", 
+        severity: "high", 
+        detected: "Historical - 2008-Present",
+        keywords: ["ghost", "gh0st", "rat"],
+        hash: "e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1",
+        behavior: ["Chinese APT tool", "Remote control", "Screen capture", "File operations", "Webcam/mic access"],
+        indicators: ["Magic string 'Gh0st' in traffic", "DLL injection", "Service installation", "Custom protocol"],
+        mitigation: "Remove backdoor, investigate data exfiltration, block C2, assess APT activity"
+      },
+      { 
+        id: 25, 
+        name: "PlugX", 
+        type: "Backdoor", 
+        severity: "high", 
+        detected: "Historical - 2012-Present",
+        keywords: ["plugx", "plug"],
+        hash: "f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2",
+        behavior: ["Chinese APT backdoor", "DLL side-loading", "Modular plugins", "USB propagation", "Keylogging"],
+        indicators: ["Legitimate signed binaries abused", "Encrypted config files", "USB spreading", "Custom C2 protocol"],
+        mitigation: "Hunt for side-loaded DLLs, remove USB worm, block C2, assess compromise scope"
+      },
+      { 
+        id: 26, 
+        name: "Sliver", 
+        type: "Backdoor", 
+        severity: "high", 
+        detected: "Tool Abuse - Modern",
+        keywords: ["sliver"],
+        hash: "a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7",
+        behavior: ["Open-source C2 framework", "Cobalt Strike alternative", "Post-exploitation", "Cross-platform", "Encrypted C2"],
+        indicators: ["Sliver implant signatures", "mTLS traffic", "In-memory execution", "Dynamic generation"],
+        mitigation: "Hunt for implants, block C2 channels, investigate lateral movement"
+      },
+      { 
+        id: 27, 
+        name: "APT29 (Cozy Bear)", 
+        type: "APT", 
+        severity: "high", 
+        detected: "Nation State - Ongoing",
+        keywords: ["apt29", "cozy", "bear"],
+        hash: "f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5",
+        behavior: ["Russian APT group", "Spear phishing", "Zero-days", "SolarWinds supply chain", "Long-term persistence"],
+        indicators: ["WellMess malware", "SUNBURST backdoor", "Stealth techniques", "Government targeting"],
+        mitigation: "Nation-state threat - Engage CISA, implement zero trust, hunt for IOCs, secure supply chain"
+      },
+
+      // MEDIUM SEVERITY THREATS
+      { 
+        id: 28, 
+        name: "ILOVEYOU", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2000",
+        keywords: ["iloveyou", "love"],
+        hash: "3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8",
+        behavior: ["Email worm", "VBScript", "Overwrites files", "Steals passwords", "Sends to all contacts"],
+        indicators: ["Subject: ILOVEYOU", "Attachment: LOVE-LETTER-FOR-YOU.txt.vbs", "Spreads via Outlook", "$10 billion damage"],
+        mitigation: "Historical threat - Block .vbs files, user awareness training, email filtering"
+      },
+      { 
+        id: 29, 
+        name: "Melissa Virus", 
+        type: "Virus", 
+        severity: "medium", 
+        detected: "Historical - 1999",
+        keywords: ["melissa"],
+        hash: "c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3",
+        behavior: ["Macro virus", "Email propagation", "Word document infection", "Mails itself to contacts", "First major email virus"],
+        indicators: ["Subject: Important Message", "Word document with macro", "Outlook address book access"],
+        mitigation: "Historical threat - Disable macros, email filtering, antivirus updates"
+      },
+      { 
+        id: 30, 
+        name: "Code Red", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2001",
+        keywords: ["codered", "code", "red"],
+        hash: "b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2",
+        behavior: ["IIS web server worm", "Buffer overflow exploit", "DDoS attacks", "Defaces websites", "Memory-resident"],
+        indicators: ["Defacement: Hacked by Chinese", "No disk files", "Port 80 scanning", "White House DDoS"],
+        mitigation: "Historical - Patch IIS, filter port 80 traffic, reboot infected servers"
+      },
+      { 
+        id: 31, 
+        name: "Nimda", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2001",
+        keywords: ["nimda"],
+        hash: "a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1",
+        behavior: ["Multi-vector worm", "Email, web, file shares", "IIS exploitation", "Mass infection", "Fast spreading"],
+        indicators: ["Creates admin.dll", "Modifies web pages", "Network share scanning", "Email attachments"],
+        mitigation: "Historical - Patch systems, clean shares, antivirus scanning"
+      },
+      { 
+        id: 32, 
+        name: "Sasser", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2004",
+        keywords: ["sasser"],
+        hash: "f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0",
+        behavior: ["LSASS exploit", "Causes crashes/reboots", "Port 445 scanning", "No user action needed", "Rapid spreading"],
+        indicators: ["System crashes", "Constant rebooting", "Network scanning", "LSASS.exe crashes"],
+        mitigation: "Historical - Patch MS04-011, block port 445, clean infected systems"
+      },
+      { 
+        id: 33, 
+        name: "Mydoom", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2004",
+        keywords: ["mydoom", "doom"],
+        hash: "e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9",
+        behavior: ["Fastest spreading worm", "Email propagation", "DDoS backdoor", "Network share infection", "P2P spreading"],
+        indicators: ["Error message in email", ".zip/.bat/.cmd attachments", "Opens backdoor port", "Searches for email addresses"],
+        mitigation: "Historical - Email filtering, block backdoor ports, antivirus scanning"
+      },
+      { 
+        id: 34, 
+        name: "Slammer (Sapphire)", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2003",
+        keywords: ["slammer", "sapphire"],
+        hash: "d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8",
+        behavior: ["SQL Server worm", "UDP port 1434", "Memory-resident", "Fastest spreading ever", "DDoS effects"],
+        indicators: ["376 bytes size", "Generates random IPs", "SQL Server crashes", "Internet slowdown"],
+        mitigation: "Historical - Patch SQL Server, block port 1434, restart infected servers"
+      },
+      { 
+        id: 35, 
+        name: "Blaster (Lovsan)", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2003",
+        keywords: ["blaster", "lovsan"],
+        hash: "c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7",
+        behavior: ["RPC vulnerability", "Causes system shutdown", "DDoS Microsoft", "Port 135 exploitation", "Countdown timer"],
+        indicators: ["60-second shutdown timer", "Message about Billy Gates", "msblast.exe", "Port scanning"],
+        mitigation: "Historical - Patch MS03-026, block port 135, remove worm"
+      },
+      { 
+        id: 36, 
+        name: "Storm Worm", 
+        type: "Worm", 
+        severity: "medium", 
+        detected: "Historical - 2007",
+        keywords: ["storm", "worm"],
+        hash: "b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6",
+        behavior: ["Spam email botnet", "Trojan dropper", "DDoS capabilities", "P2P C2", "Rootkit features"],
+        indicators: ["Weather-related email subjects", "Encrypted P2P traffic", "Rootkit installation", "Spam operations"],
+        mitigation: "Historical - Email filtering, P2P traffic blocking, rootkit removal"
+      },
+      { 
+        id: 37, 
+        name: "Lumma Stealer", 
+        type: "Spyware", 
+        severity: "medium", 
+        detected: "Modern - 2024",
+        keywords: ["lumma", "stealer"],
+        hash: "b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4",
+        behavior: ["Browser credential theft", "2FA tokens", "Cryptocurrency wallets", "Password managers", "Session cookies"],
+        indicators: ["Chrome/Firefox targeting", "Wallet extension theft", "C2 exfiltration", "Anti-debug checks"],
+        mitigation: "Reset all credentials, enable 2FA on new device, check unauthorized transactions"
+      },
+      { 
+        id: 38, 
+        name: "Vidar Stealer", 
+        type: "Spyware", 
+        severity: "medium", 
+        detected: "Modern - 2024",
+        keywords: ["vidar", "stealer"],
+        hash: "e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4",
+        behavior: ["MaaS information stealer", "Browser data theft", "Crypto wallet targeting", "File exfiltration", "Screenshot capture"],
+        indicators: ["Telegram C2", "Profile data theft", "Clipboard monitoring", "Sold as service"],
+        mitigation: "Change passwords, check for fraud, scan for data leaks, monitor accounts"
+      },
+      { 
+        id: 39, 
+        name: "XMRig (Cryptominer)", 
+        type: "Cryptominer", 
+        severity: "medium", 
+        detected: "Modern - Ongoing",
+        keywords: ["xmrig", "miner", "crypto"],
+        hash: "b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1d0c9b8",
+        behavior: ["Monero mining", "High CPU usage", "Process hiding", "Persistence mechanisms", "Performance degradation"],
+        indicators: ["Mining pool connections", "Elevated resource usage", "Hidden processes", "Modified system files"],
+        mitigation: "Terminate mining services, remove persistence, monitor system resources"
+      },
+      { 
+        id: 40, 
+        name: "Bundlore (Adware)", 
+        type: "Adware", 
+        severity: "medium", 
+        detected: "Modern - Mac targeting",
+        keywords: ["bundlore", "adware"],
+        hash: "e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2e1",
+        behavior: ["Mac adware bundler", "Browser hijacking", "Installs unwanted software", "Tracks browsing", "Ad injection"],
+        indicators: ["Bundled app installers", "Changed browser settings", "New toolbars", "System slowdown"],
+        mitigation: "Uninstall bundled programs, restore browser defaults, run cleanup tools"
+      },
+
+      // LOW SEVERITY THREATS
+      { 
+        id: 41, 
+        name: "Akira Ransomware", 
+        type: "Ransomware", 
+        severity: "low", 
+        detected: "Modern - 2024",
+        keywords: ["akira"],
+        hash: "f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5",
+        behavior: ["VPN vulnerability targeting", "Data exfiltration", "Double extortion", "Deletes shadow copies", "Moderate impact"],
+        indicators: ["Cisco VPN exploitation", ".akira extension", "TOR leak site", "PowerShell execution"],
+        mitigation: "Patch VPN appliances, network segmentation, maintain offline backups"
+      },
+      { 
+        id: 42, 
+        name: "Amadey Bot", 
+        type: "Trojan", 
+        severity: "low", 
+        detected: "Modern - 2024",
+        keywords: ["amadey", "bot"],
+        hash: "c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2",
+        behavior: ["Bot functionality", "Payload delivery", "System fingerprinting", "Credential theft", "Low sophistication"],
+        indicators: ["HTTP C2 traffic", "UAC bypass", "Registry modifications", "Task creation"],
+        mitigation: "Remove bot, block C2 servers, scan for payloads"
+      },
+      { 
+        id: 43, 
+        name: "AnyDesk (Riskware)", 
+        type: "Riskware", 
+        severity: "low", 
+        detected: "Legitimate Tool Abuse",
+        keywords: ["anydesk", "remote"],
+        hash: "e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8",
+        behavior: ["Legitimate remote tool", "Used in tech support scams", "Potential unauthorized access", "Data exfiltration risk", "Social engineering"],
+        indicators: ["Unexpected installation", "Unauthorized sessions", "Data transfer", "Suspicious connections"],
+        mitigation: "Verify legitimate use, remove if unauthorized, monitor for abuse"
+      },
+      { 
+        id: 44, 
+        name: "PCOptimizer (Scareware)", 
+        type: "Adware", 
+        severity: "low", 
+        detected: "Modern - Ongoing",
+        keywords: ["pcoptimizer", "optimizer", "scareware"],
+        hash: "b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1",
+        behavior: ["Fake optimization tool", "False system warnings", "Payment requests", "Minimal functionality", "Scare tactics"],
+        indicators: ["Fake scan results", "Persistent pop-ups", "Purchase pressure", "Unwanted installation"],
+        mitigation: "Uninstall fake optimizer, ignore warnings, educate users about scareware"
+      },
+      { 
+        id: 45, 
+        name: "SearchNuisance", 
+        type: "Adware", 
+        severity: "low", 
+        detected: "Modern - Browser hijacker",
+        keywords: ["search", "nuisance", "hijacker"],
+        hash: "d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3",
+        behavior: ["Browser search hijacking", "Sponsored results", "Query tracking", "Affiliate revenue", "Annoyance"],
+        indicators: ["Modified search provider", "Unwanted toolbars", "Search redirection", "Tracking cookies"],
+        mitigation: "Reset browser defaults, remove hijacker, clear browsing data"
+      },
+      { 
+        id: 46, 
+        name: "Log4Shell Scanner", 
+        type: "Exploit", 
+        severity: "low", 
+        detected: "Reconnaissance - 2021+",
+        keywords: ["log4shell", "log4j", "scanner"],
+        hash: "a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0",
+        behavior: ["Scans for Log4j vulnerability", "JNDI injection attempts", "Reconnaissance activity", "Potential RCE setup", "Automated scanning"],
+        indicators: ["Log4j exploit strings", "LDAP callbacks", "Java errors", "Network scanning"],
+        mitigation: "Patch Log4j immediately, monitor for exploitation, implement WAF rules"
+      },
+      { 
+        id: 47, 
+        name: "GitPaste Worm", 
+        type: "Worm", 
+        severity: "low", 
+        detected: "Linux targeting - 2020+",
+        keywords: ["gitpaste", "git"],
+        hash: "f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9",
+        behavior: ["Linux worm", "Cryptocurrency mining", "GitHub payload hosting", "SSH brute force", "Self-propagation"],
+        indicators: ["SSH attacks", "Cron job modifications", "GitHub downloads", "Mining pool traffic"],
+        mitigation: "Secure SSH, remove cron jobs, block mining pools, update systems"
+      },
+      { 
+        id: 48, 
+        name: "Stalkerware Mobile", 
+        type: "Spyware", 
+        severity: "low", 
+        detected: "Mobile targeting - Ongoing",
+        keywords: ["stalker", "mobile", "spy"],
+        hash: "d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7",
+        behavior: ["Device location tracking", "Communication monitoring", "Call/message recording", "Hidden from app list", "Intimate partner surveillance"],
+        indicators: ["Battery drain", "Data usage spikes", "Hidden icons", "Background services"],
+        mitigation: "Factory reset recommended, check apps, update security, seek support resources"
+      },
+      { 
+        id: 49, 
+        name: "ChromeExt Bundler", 
+        type: "Adware", 
+        severity: "low", 
+        detected: "Browser targeting",
+        keywords: ["chrome", "extension", "bundler"],
+        hash: "f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f2",
+        behavior: ["Browser extension bundling", "Ad injection", "Browsing tracking", "Search redirection", "Affiliate fraud"],
+        indicators: ["Unauthorized extensions", "Modified search", "Tracking cookies", "Ad scripts"],
+        mitigation: "Remove malicious extensions, clear browser data, scan for bundleware"
+      },
+      { 
+        id: 50, 
+        name: "Royal Ransomware", 
+        type: "Ransomware", 
+        severity: "low", 
+        detected: "Modern - 2024",
+        keywords: ["royal"],
+        hash: "a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7d6c5b4a3",
+        behavior: ["Partial encryption", "Enterprise targeting", "Double extortion", "ESXi attacks", "Moderate sophistication"],
+        indicators: ["Intermittent encryption", "Text ransom notes", "PowerShell scripts", "Lateral movement"],
+        mitigation: "Isolate segments, restore from backups, engage threat intelligence"
+      }
+    ];
+
+    const scanStages = [
+      { name: "File Upload", description: "Receiving and verifying file integrity", duration: 800 },
+      { name: "Hash Calculation", description: "Computing MD5, SHA1, and SHA256 hashes", duration: 600 },
+      { name: "Signature Scanning", description: "Comparing against known malware signatures", duration: 1200 },
+      { name: "Behavioral Analysis", description: "Analyzing file patterns and structure", duration: 1500 },
+      { name: "Threat Intelligence", description: "Querying global threat databases", duration: 1000 },
+      { name: "Classification", description: "Determining threat level and type", duration: 700 }
+    ];
+
+    let currentFilter = 'all';
+    let filteredThreats = [...sampleThreats];
+    let analysisTimeout;
+    let currentAnalyzedThreat = null;
+
+    function matchFileToThreat(fileName) {
+      const lowerName = fileName.toLowerCase();
+      
+      // Try to match based on filename keywords
+      for (const threat of sampleThreats) {
+        for (const keyword of threat.keywords) {
+          if (lowerName.includes(keyword)) {
+            return threat;
+          }
+        }
+      }
+      
+      // If no match, return a random threat based on file extension
+      const extension = fileName.split('.').pop().toLowerCase();
+      let threatType = 'Trojan'; // default
+      
+      if (['exe', 'dll', 'sys'].includes(extension)) {
+        const executableThreats = sampleThreats.filter(t => 
+          ['Ransomware', 'Trojan', 'Worm', 'Rootkit'].includes(t.type)
+        );
+        return executableThreats[Math.floor(Math.random() * executableThreats.length)];
+      } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx'].includes(extension)) {
+        const documentThreats = sampleThreats.filter(t => 
+          ['Virus', 'Trojan'].includes(t.type)
+        );
+        return documentThreats[Math.floor(Math.random() * documentThreats.length)];
+      } else if (['zip', 'rar', '7z'].includes(extension)) {
+        const archivedThreats = sampleThreats.filter(t => 
+          ['Worm', 'Trojan', 'Backdoor'].includes(t.type)
+        );
+        return archivedThreats[Math.floor(Math.random() * archivedThreats.length)];
+      }
+      
+      // Default random threat
+      return sampleThreats[Math.floor(Math.random() * sampleThreats.length)];
+    }
+
+    function getSeverityColor(severity) {
+      const config = window.elementSdk?.config || defaultConfig;
+      const colors = {
+        critical: config.critical_color || defaultConfig.critical_color,
+        high: config.high_color || defaultConfig.high_color,
+        medium: '#f59e0b',
+        low: '#10b981'
+      };
+      return colors[severity];
+    }
+
+    function getSeverityIcon(severity) {
+      const icons = {
+        critical: '🔴',
+        high: '🟠',
+        medium: '🟡',
+        low: '🟢'
+      };
+      return icons[severity];
+    }
+
+    function renderThreats() {
+      const container = document.getElementById('threats-container');
+      
+      container.innerHTML = filteredThreats.slice(0, 12).map(threat => `
+        <div class="threat-card" onclick="showDetailedReport(${threat.id})" style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid ${getSeverityColor(threat.severity)};">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.5rem;">${getSeverityIcon(threat.severity)}</span>
+                <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937;">${threat.name}</h3>
+              </div>
+              <p style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.75rem;">Detected: ${threat.detected}</p>
+            </div>
+            <span class="badge" style="background: ${getSeverityColor(threat.severity)}20; color: ${getSeverityColor(threat.severity)}; text-transform: uppercase;">
+              ${threat.severity}
+            </span>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+            <div>
+              <p style="color: #6b7280; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">TYPE</p>
+              <p style="color: #1f2937; font-weight: 600;">${threat.type}</p>
+            </div>
+            <div>
+              <p style="color: #6b7280; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;">HASH</p>
+              <p style="color: #1f2937; font-family: monospace; font-size: 0.75rem;">${threat.hash.substring(0, 12)}...</p>
+            </div>
+          </div>
+          
+          <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; text-align: center;">
+            <span style="color: #667eea; font-size: 0.875rem; font-weight: 600;">Click to view full report →</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function showDetailedReport(threatId) {
+      const threat = sampleThreats.find(t => t.id === threatId);
+      if (!threat) return;
+
+      renderThreatDetailModal(threat);
+      document.getElementById('report-modal').classList.remove('hidden');
+    }
+
+    function showDetailedReportForResult() {
+      if (currentAnalyzedThreat) {
+        renderThreatDetailModal(currentAnalyzedThreat);
+        document.getElementById('report-modal').classList.remove('hidden');
+      }
+    }
+
+    function renderThreatDetailModal(threat) {
+      document.getElementById('modal-title').textContent = threat.name;
+      document.getElementById('modal-detected').textContent = `Detected: ${threat.detected}`;
+
+      const modalBody = document.getElementById('modal-body');
+      modalBody.innerHTML = `
+        <div style="margin-bottom: 2rem;">
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+            <span style="font-size: 3rem;">${getSeverityIcon(threat.severity)}</span>
+            <div>
+              <span class="badge" style="background: ${getSeverityColor(threat.severity)}20; color: ${getSeverityColor(threat.severity)}; text-transform: uppercase; font-size: 1rem; padding: 0.5rem 1rem;">
+                ${threat.severity} THREAT
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem;">File Information</h3>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 1.5rem;">
+            <div style="display: grid; gap: 1rem;">
+              <div style="display: grid; grid-template-columns: 150px 1fr; gap: 0.5rem;">
+                <span style="color: #6b7280; font-weight: 600;">Threat Name:</span>
+                <span style="color: #1f2937; font-family: monospace;">${threat.name}</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 150px 1fr; gap: 0.5rem;">
+                <span style="color: #6b7280; font-weight: 600;">MD5 Hash:</span>
+                <span style="color: #1f2937; font-family: monospace; word-break: break-all; font-size: 0.875rem;">${threat.hash}</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 150px 1fr; gap: 0.5rem;">
+                <span style="color: #6b7280; font-weight: 600;">Threat Type:</span>
+                <span style="color: #1f2937; font-weight: 600;">${threat.type}</span>
+              </div>
+              <div style="display: grid; grid-template-columns: 150px 1fr; gap: 0.5rem;">
+                <span style="color: #6b7280; font-weight: 600;">Detection Time:</span>
+                <span style="color: #1f2937;">${threat.detected}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem;">Behavioral Analysis</h3>
+          <div style="background: #fef3f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1.5rem;">
+            <p style="font-weight: 600; color: #991b1b; margin-bottom: 1rem;">⚠️ Malicious Behaviors Detected:</p>
+            <ul style="list-style: none; padding: 0; margin: 0;">
+              ${threat.behavior.map(b => `
+                <li style="padding: 0.5rem 0; color: #7c2d12; display: flex; align-items: start; gap: 0.5rem;">
+                  <span style="color: #dc2626;">●</span>
+                  <span>${b}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem;">Indicators of Compromise (IOCs)</h3>
+          <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 1.5rem;">
+            <ul style="list-style: none; padding: 0; margin: 0;">
+              ${threat.indicators.map(i => `
+                <li style="padding: 0.5rem 0; color: #78350f; display: flex; align-items: start; gap: 0.5rem;">
+                  <span style="color: #f59e0b;">▸</span>
+                  <span>${i}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h3 style="font-size: 1.25rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem;">Recommended Actions</h3>
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1.5rem;">
+            <p style="color: #166534; line-height: 1.6;">
+              ${threat.mitigation}
+            </p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <button onclick="closeReportModal()" style="flex: 1; min-width: 200px; background: #667eea; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer;">
+            Close Report
+          </button>
+        </div>
+      `;
+    }
+
+    function closeReportModal() {
+      document.getElementById('report-modal').classList.add('hidden');
+    }
+
+    function closeModal(event) {
+      if (event.target.classList.contains('modal-overlay')) {
+        closeReportModal();
+      }
+    }
+
+    function filterBySeverity(severity) {
+      currentFilter = severity;
+      applyFilters();
+      
+      ['all', 'critical', 'high', 'medium', 'low'].forEach(s => {
+        const btn = document.getElementById(`filter-${s}`);
+        if (s === severity) {
+          btn.style.background = '#667eea';
+          btn.style.color = 'white';
+        } else {
+          btn.style.background = '#f3f4f6';
+          btn.style.color = '#374151';
+        }
+      });
+    }
+
+    function applyFilters() {
+      if (currentFilter === 'all') {
+        filteredThreats = [...sampleThreats];
+      } else {
+        filteredThreats = sampleThreats.filter(t => t.severity === currentFilter);
+      }
+
+      renderThreats();
+    }
+
+    function updateCounts() {
+      const counts = {
+        all: sampleThreats.length,
+        critical: sampleThreats.filter(t => t.severity === 'critical').length,
+        high: sampleThreats.filter(t => t.severity === 'high').length,
+        medium: sampleThreats.filter(t => t.severity === 'medium').length,
+        low: sampleThreats.filter(t => t.severity === 'low').length
+      };
+      
+      document.getElementById('count-all').textContent = counts.all;
+      document.getElementById('count-critical').textContent = counts.critical;
+      document.getElementById('count-high').textContent = counts.high;
+      document.getElementById('count-medium').textContent = counts.medium;
+      document.getElementById('count-low').textContent = counts.low;
+    }
+
+    // File upload handling
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragging');
+    });
+
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('dragging');
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragging');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        startAnalysis(files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        startAnalysis(e.target.files[0]);
+      }
+    });
+
+    function startAnalysis(file) {
+      currentAnalyzedThreat = matchFileToThreat(file.name);
+      
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-size').textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+      
+      document.getElementById('database-section').classList.add('hidden');
+      document.getElementById('result-section').classList.add('hidden');
+      document.getElementById('upload-section').classList.add('hidden');
+      document.getElementById('analysis-section').classList.remove('hidden');
+
+      renderScanStages();
+      runAnalysis();
+    }
+
+    function renderScanStages() {
+      const container = document.getElementById('scan-stages');
+      container.innerHTML = scanStages.map((stage, index) => `
+        <div id="stage-${index}" class="scan-stage">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
+                <span id="stage-icon-${index}" style="font-size: 1.25rem;">⏳</span>
+                <h4 style="font-weight: 700; color: #1f2937;">${stage.name}</h4>
+              </div>
+              <p style="color: #6b7280; font-size: 0.875rem;">${stage.description}</p>
+            </div>
+            <span id="stage-status-${index}" style="font-weight: 600; color: #6b7280; font-size: 0.875rem;">Pending</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function runAnalysis() {
+      let totalProgress = 0;
+      const progressPerStage = 100 / scanStages.length;
+
+      for (let i = 0; i < scanStages.length; i++) {
+        const stage = scanStages[i];
+        const stageElement = document.getElementById(`stage-${i}`);
+        const iconElement = document.getElementById(`stage-icon-${i}`);
+        const statusElement = document.getElementById(`stage-status-${i}`);
+
+        stageElement.classList.add('active');
+        iconElement.innerHTML = '<span class="spinner">⟳</span>';
+        statusElement.textContent = 'Running...';
+        statusElement.style.color = '#667eea';
+
+        await new Promise(resolve => {
+          analysisTimeout = setTimeout(resolve, stage.duration);
+        });
+
+        stageElement.classList.remove('active');
+        stageElement.classList.add('complete');
+        iconElement.textContent = '✓';
+        statusElement.textContent = 'Complete';
+        statusElement.style.color = '#10b981';
+
+        totalProgress += progressPerStage;
+        document.getElementById('progress-fill').style.width = `${totalProgress}%`;
+        document.getElementById('progress-percent').textContent = `${Math.round(totalProgress)}%`;
+      }
+
+      setTimeout(() => {
+        showAnalysisResult();
+      }, 500);
+    }
+
+    function showAnalysisResult() {
+      document.getElementById('analysis-section').classList.add('hidden');
+      
+      const resultContent = document.getElementById('result-content');
+      const threat = currentAnalyzedThreat;
+      
+      resultContent.innerHTML = `
+        <div style="background: ${getSeverityColor(threat.severity)}10; border: 2px solid ${getSeverityColor(threat.severity)}; border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+            <span style="font-size: 2.5rem;">${getSeverityIcon(threat.severity)}</span>
+            <div>
+              <h3 style="font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 0.25rem;">${threat.name}</h3>
+              <span class="badge" style="background: ${getSeverityColor(threat.severity)}; color: white; text-transform: uppercase;">
+                ${threat.severity} THREAT DETECTED
+              </span>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+            <div style="background: white; padding: 1rem; border-radius: 8px;">
+              <p style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.25rem;">Threat Type</p>
+              <p style="color: #1f2937; font-weight: 700; font-size: 1.125rem;">${threat.type}</p>
+            </div>
+            <div style="background: white; padding: 1rem; border-radius: 8px;">
+              <p style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.25rem;">Severity Level</p>
+              <p style="color: ${getSeverityColor(threat.severity)}; font-weight: 700; font-size: 1.125rem; text-transform: uppercase;">${threat.severity}</p>
+            </div>
+            <div style="background: white; padding: 1rem; border-radius: 8px;">
+              <p style="color: #6b7280; font-size: 0.875rem; margin-bottom: 0.25rem;">Status</p>
+              <p style="color: #dc2626; font-weight: 700; font-size: 1.125rem;">🛑 Quarantined</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #f9fafb; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
+          <h4 style="font-weight: 700; color: #1f2937; margin-bottom: 0.75rem;">Quick Summary</h4>
+          <p style="color: #6b7280; line-height: 1.6; margin-bottom: 1rem;">${threat.behavior.slice(0, 2).join('. ')}.</p>
+          <p style="color: #667eea; font-weight: 600; font-size: 0.875rem;">Click "View Full Report" below for detailed analysis and mitigation steps.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+          <div style="background: #fef3f2; border: 1px solid #fecaca; border-radius: 8px; padding: 1rem;">
+            <p style="font-weight: 600; color: #991b1b; margin-bottom: 0.5rem;">⚠️ Behaviors: ${threat.behavior.length}</p>
+            <p style="color: #7c2d12; font-size: 0.875rem;">Malicious actions detected</p>
+          </div>
+          <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 1rem;">
+            <p style="font-weight: 600; color: #78350f; margin-bottom: 0.5rem;">🔍 IOCs: ${threat.indicators.length}</p>
+            <p style="color: #78350f; font-size: 0.875rem;">Indicators of compromise found</p>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('result-section').classList.remove('hidden');
+    }
+
+    function resetUpload() {
+      document.getElementById('result-section').classList.add('hidden');
+      document.getElementById('upload-section').classList.remove('hidden');
+      document.getElementById('database-section').classList.remove('hidden');
+      currentAnalyzedThreat = null;
+      fileInput.value = '';
+    }
+
+    function cancelAnalysis() {
+      clearTimeout(analysisTimeout);
+      document.getElementById('analysis-section').classList.add('hidden');
+      document.getElementById('upload-section').classList.remove('hidden');
+      document.getElementById('database-section').classList.remove('hidden');
+    }
+
+    async function onConfigChange(config) {
+      const customFont = config.font_family || defaultConfig.font_family;
+      const baseSize = config.font_size || defaultConfig.font_size;
+      const baseFontStack = 'system-ui, -apple-system, sans-serif';
+      
+      document.getElementById('main-title').style.fontFamily = `${customFont}, ${baseFontStack}`;
+      document.getElementById('main-title').style.fontSize = `${baseSize * 2.5}px`;
+      
+      document.getElementById('subtitle').style.fontFamily = `${customFont}, ${baseFontStack}`;
+      document.getElementById('subtitle').style.fontSize = `${baseSize * 1.125}px`;
+      
+      document.getElementById('main-title').textContent = config.main_title || defaultConfig.main_title;
+      document.getElementById('subtitle').textContent = config.subtitle || defaultConfig.subtitle;
+      
+      document.querySelector('main').style.background = `linear-gradient(135deg, ${config.background_color || defaultConfig.background_color} 0%, #764ba2 100%)`;
+      
+      renderThreats();
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.card_color || defaultConfig.card_color,
+              set: (value) => {
+                config.card_color = value;
+                window.elementSdk.setConfig({ card_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.critical_color || defaultConfig.critical_color,
+              set: (value) => {
+                config.critical_color = value;
+                window.elementSdk.setConfig({ critical_color: value });
+              }
+            },
+            {
+              get: () => config.high_color || defaultConfig.high_color,
+              set: (value) => {
+                config.high_color = value;
+                window.elementSdk.setConfig({ high_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["main_title", config.main_title || defaultConfig.main_title],
+          ["subtitle", config.subtitle || defaultConfig.subtitle]
+        ])
+      });
+    }
+
+    renderThreats();
+    updateCounts();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b1f8fccf31b6eef',t:'MTc2NjQwNTkwNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
